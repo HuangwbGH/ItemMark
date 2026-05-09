@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>批量打印标签 — 共 {{ items|length }} 条</title>
+  <style>
+    /* ── CSS 变量（由 label_config.xlsx 控制） ── */
+    :root {
+      --label-w:     {{ cfg.label_width_mm }}mm;
+      --label-min-h: {{ cfg.label_min_height_mm }}mm;
+      --label-pad:   {{ cfg.label_padding_mm }}mm;
+      --name-fs:     {{ cfg.name_font_size_pt }}pt;
+      --field-fs:    {{ cfg.field_font_size_pt }}pt;
+      --field-kw:    {{ cfg.field_label_width }};
+      --qr-size:     {{ cfg.qr_size_mm }}mm;
+      --footer-fs:   {{ cfg.footer_font_size_pt }}pt;
+      --cols:        {{ cfg.labels_per_row }};
+      --gap:         {{ cfg.label_gap_mm }}mm;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      background: #ddd;
+      padding: 20px;
+    }
+
+    /* ── 工具栏 ── */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      background: #fff;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.1);
+    }
+    .toolbar h2   { font-size: 16px; flex: 1; }
+    .toolbar .sub { font-size: 13px; color: #888; }
+    .btn {
+      padding: 7px 20px;
+      border-radius: 5px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-print { background: #1a6fc4; color: #fff; }
+    .btn-back  { background: #f0f0f0; color: #333; }
+
+    /* ── 标签网格 ── */
+    .labels-grid {
+      display: grid;
+      grid-template-columns: repeat(var(--cols), var(--label-w));
+      gap: var(--gap);
+      justify-content: center;
+    }
+
+    /* ── 单张标签 ── */
+    .label-card {
+      width: var(--label-w);
+      min-height: var(--label-min-h);
+      background: #fff;
+      border: 1px solid #bbb;
+      border-radius: 3px;
+      padding: var(--label-pad);
+      display: flex;
+      flex-direction: column;
+      gap: 2mm;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    .lbl-name {
+      font-size: var(--name-fs);
+      font-weight: 700;
+      text-align: center;
+      border-bottom: 1px solid #e0e0e0;
+      padding-bottom: 2mm;
+      line-height: 1.3;
+      word-break: break-all;
+      -webkit-line-clamp: {{ cfg.name_max_lines }};
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .lbl-body {
+      display: flex;
+      gap: 2.5mm;
+      align-items: flex-start;
+      flex: 1;
+    }
+    .lbl-info {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 1.2mm;
+    }
+    .lbl-row {
+      display: flex;
+      gap: 1.5mm;
+      font-size: var(--field-fs);
+      line-height: 1.5;
+    }
+    .lbl-row .k {
+      flex: 0 0 var(--field-kw);
+      color: #555;
+      font-weight: 600;
+    }
+    .lbl-row .v {
+      flex: 1;
+      color: #111;
+      word-break: break-all;
+    }
+
+    {% if cfg.qr_show %}
+    .lbl-qr {
+      flex: 0 0 var(--qr-size);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1mm;
+    }
+    .lbl-qr img {
+      width: var(--qr-size);
+      height: var(--qr-size);
+      display: block;
+    }
+    .lbl-qr .qt { font-size: 5.5pt; color: #aaa; text-align: center; }
+    {% endif %}
+
+    {% if cfg.footer_show %}
+    .lbl-footer {
+      border-top: 1px solid #efefef;
+      padding-top: 1mm;
+      font-size: var(--footer-fs);
+      color: #bbb;
+      display: flex;
+      justify-content: space-between;
+    }
+    {% endif %}
+
+    /* ── 打印样式 ── */
+    @page {
+      /* 去掉浏览器默认页边距，避免内容被裁剪 */
+      {% if cfg.labels_per_page == 1 %}
+      size: {{ cfg.label_width_mm }}mm {{ cfg.label_min_height_mm }}mm;
+      {% endif %}
+      margin: 0;
+    }
+
+    @media print {
+      body {
+        background: #fff;
+        padding: 0;
+        margin: 0;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+      .toolbar { display: none; }
+
+      .labels-grid {
+        grid-template-columns: repeat({{ cfg.labels_per_row }}, {{ cfg.label_width_mm }}mm);
+        gap: {{ cfg.label_gap_mm }}mm;
+      }
+
+      .label-card {
+        border: 1px solid #999;
+        box-shadow: none;
+        border-radius: 0;
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+
+      {% if cfg.labels_per_page > 0 %}
+      .label-card:nth-child({{ cfg.labels_per_page }}n) {
+        page-break-after: always;
+        break-after: always;
+      }
+      {% endif %}
+    }
+  </style>
+</head>
+<body>
+
+<div class="toolbar">
+  <h2>批量打印标签</h2>
+  <span class="sub">共 {{ items|length }} 条 · 每行 {{ cfg.labels_per_row }} 张{% if cfg.labels_per_page > 0 %} · 每页 {{ cfg.labels_per_page }} 张{% endif %}</span>
+  <button class="btn btn-back"  onclick="window.close()">关闭</button>
+  <button class="btn btn-print" onclick="window.print()">打印全部</button>
+</div>
+
+<div class="labels-grid">
+  {% for item in items %}
+  <div class="label-card">
+
+    <div class="lbl-name">{{ item.material_name or '—' }}</div>
+
+    <div class="lbl-body">
+      <div class="lbl-info">
+        {% for field in cfg.visible_fields %}
+        <div class="lbl-row">
+          <span class="k">{{ field.label }}</span>
+          <span class="v">{{ item[field.key] or '—' }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if cfg.qr_show %}
+      <div class="lbl-qr">
+        <img src="{{ public_base_path }}/qr/{{ item.material_code }}" alt="QR" />
+        <span class="qt">扫码查看详情</span>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if cfg.footer_show %}
+    <div class="lbl-footer">
+      <span>{{ footer_text(cfg.footer_left_text, item) }}</span>
+      <span>{{ footer_text(cfg.footer_right_text, item) }}</span>
+    </div>
+    {% endif %}
+
+  </div>
+  {% endfor %}
+</div>
+
+</body>
+</html>

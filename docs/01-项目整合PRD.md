@@ -1,0 +1,332 @@
+# ItemMark 项目整合 PRD
+
+状态：待确认后实施，已吸收 2026-05-09 的确认项
+
+## 1. 项目定位
+
+统一项目名称：ItemMark
+
+中文名称：物品标签与扫码查询系统
+
+ItemMark 是一个统一部署的标签打印和扫码查询平台。系统部署在 Linux OS，通过 Docker 运行，统一使用域名 `https://code.zestrade.com` 对外访问。系统内部划分多个业务模块，不同模块可以使用不同的数据源、标签模板、二维码路径和扫码详情页。
+
+首版模块：
+
+| 模块 | 来源 | 用途 | 二维码扫码结果 |
+|---|---|---|---|
+| 对外物料信息模块 | 旧项目 1 `material-label-system` | 打印对外物料信息标签 | 查询物料基础信息 |
+| 武平模块 | 旧项目 2 `wupingPMC` | 打印仓库货架标签 | 查询物料基础信息、当前结存、近一年出入库台账 |
+
+## 2. 目标
+
+1. 把两个旧项目整合为一个 ItemMark 项目，所有相关文件放在 `/Users/mac/Desktop/ItemMark`。
+2. 保留旧项目 1 已调试好的标签模板、二维码打印效果和扫码物料信息查询能力。
+3. 保留旧项目 2 已实现的武平库存台账查询能力。
+4. 两个模块部署在同一个服务器、同一个域名下，但二维码路径和扫码页面效果必须明确区分。
+5. 每个模块都可以分别配置 U8 数据库地址、账套、账号、密码、同步策略、二维码前缀和标签模板。
+6. 首次运行重新同步数据。
+7. 后台页面支持查看同步状态、设置自动同步时间/频率、手动触发同步。
+8. 程序实现必须遵循 `2026-04-20-LLM-写代码规范.md`：实现前明确假设和成功标准，优先简单方案，只做必要修改，完成后验证。
+9. 程序配置、Docker 挂载、数据库、证书、模板、日志等运行路径必须使用相对路径。
+10. 应用服务端口不使用常用端口号，避免和现有服务冲突。
+
+## 3. 项目命名
+
+- 代码目录：`ItemMark`
+- Web 服务：`ItemMark`
+- Docker 容器：`itemmark-web`、`itemmark-sync`
+- 默认 U8 账套：`UFDATA_104_2018`
+- 默认域名：`https://code.zestrade.com`
+- 项目名称、页面标题、README、API 文档统一使用 ItemMark。
+- “武平”保留为业务模块名，不作为项目名。
+- 对外物料信息模块路径确认使用 `/material-info`。
+- 后台同步和模块配置页面首版不做登录保护。
+- 首版保留模块 SQLite 数据隔离。
+- 首版不做 Nginx `/admin` IP 白名单。
+
+## 4. 模块划分
+
+### 4.1 对外物料信息模块
+
+模块标识：`material-info`
+
+推荐路径：
+
+- 打印选择页：`/material-info/batch`
+- 单张打印页：`/material-info/print/{material_code}`
+- 批量打印页：`/material-info/batch/print`
+- 二维码图片：`/material-info/qr/{material_code}`
+- 新二维码扫码页：`/material-info/material/{material_code}`
+- 兼容旧二维码扫码页：`/material/{material_code}`
+
+扫码展示：
+
+- 物料名称
+- 物料编码
+- 布卡号
+- 规格型号
+- 颜色
+- 单位
+- 分类、备注、材质、工艺等可选字段
+
+关键要求：
+
+- 项目 1 的标签模板和二维码效果已经调试好，整合时优先保留。
+- 如果已有旧标签二维码使用 `/material/{code}`，新系统必须继续兼容该路径。
+
+### 4.2 武平模块
+
+模块标识：`wuping`
+
+推荐路径：
+
+- 打印选择页：`/wuping/batch`
+- 单张打印页：`/wuping/print/{material_code}`
+- 批量打印页：`/wuping/batch/print`
+- 二维码图片：`/wuping/qr/{material_code}`
+- 扫码台账页：`/wuping/material/{material_code}`
+
+扫码展示：
+
+- 物料基础信息
+- 当前结存
+- 查询周期内收入合计
+- 查询周期内发出合计
+- 默认近一年出入库台账明细
+- 日期范围筛选
+
+关键要求：
+
+- 武平模块二维码必须和对外物料信息模块二维码区分。
+- 武平模块扫码后实时查询 U8 库存台账。
+- U8 台账查询失败时，页面保留基础信息并显示明确错误。
+
+## 5. 数据源与配置需求
+
+每个模块都要能独立配置：
+
+- U8 数据库地址
+- U8 端口
+- U8 账套数据库名
+- U8 账号
+- U8 密码
+- SQLite 本地缓存库
+- 二维码基础地址
+- 模块访问路径
+- 标签模板配置文件
+- 是否启用库存台账查询
+- 自动同步计划
+
+默认值：
+
+| 配置项 | 默认值 |
+|---|---|
+| U8 地址 | `192.168.1.135` |
+| U8 端口 | `1433` |
+| 对外物料信息模块账套 | `UFDATA_104_2018` |
+| 武平模块账套 | `UFDATA_105_2019` |
+| U8 账号 | `testreadonly` |
+| 部署域名 | `https://code.zestrade.com` |
+
+数据口径：
+
+- 物料基础信息在集团所有账套通用，104 账套是集团主账套、贸易账套，适合作为默认物料主数据来源。
+- 105 账套是集团下子公司工厂账套，武平模块库存出入库和结存按 105 账套查询。
+- 后续如模块需要查询其他公司或其他账套，只调整该模块的台账/同步配置，不改变项目整体结构。
+
+## 6. 同步管理需求
+
+### 6.1 首次运行
+
+- 首次启动后不依赖旧数据库作为最终数据源。
+- 系统需要重新同步物料基础资料。默认从 104 主账套同步通用物料基础信息。
+- 武平模块可以复用通用物料基础信息；库存台账查询按武平模块配置的 105 账套实时查询。
+- 允许复制旧项目数据库到新项目作为临时参考或回滚依据，但正式运行以重新同步后的数据为准。
+
+### 6.2 后台同步页面
+
+路径建议：`/admin/sync`
+
+能力：
+
+- 查看每个模块最近一次同步时间。
+- 查看同步状态：未同步、同步中、成功、失败。
+- 查看同步结果：抽取数、新增数、更新数、失败数、耗时、错误信息。
+- 为每个模块单独设置自动同步时间和频率。
+- 手动点击按钮触发某个模块同步。
+- 防止同一模块重复并发同步。
+- 首版不做登录保护，也暂不做 Nginx IP 白名单。后台暴露风险记录为后续风险，不纳入首版实施范围。
+
+### 6.3 同步配置
+
+支持两类计划：
+
+- 固定时间：例如每天 `08:00, 10:00, 14:00, 18:00`。
+- 固定频率：例如每 `60` 分钟同步一次。
+
+每个模块独立保存同步配置。
+
+## 7. 标签模板需求
+
+每个模块必须有独立模板配置：
+
+```text
+config/templates/material-info/label_config.xlsx
+config/templates/wuping/label_config.xlsx
+```
+
+要求：
+
+- 对外物料信息模块优先复制旧项目 1 已调试好的模板。
+- 武平模块使用旧项目 2 的模板逻辑，默认字段包含“单位”，二维码路径指向 `/wuping/material/{code}`。
+- 后续新增模块时，只需要新增模块配置和模板目录。
+
+## 8. 页面需求
+
+### 8.1 首页
+
+路径：`/`
+
+内容：
+
+- ItemMark 项目入口。
+- 模块入口：对外物料信息模块、武平模块。
+- 管理入口：同步管理、模块配置。
+
+### 8.2 模块打印页
+
+每个模块独立打印页，界面能力一致但模板和二维码不同：
+
+- 搜索物料。
+- 单张打印。
+- 批量选择。
+- 批量打印。
+- 读取当前模块的标签配置。
+
+### 8.3 模块扫码页
+
+扫码页根据 URL 模块前缀进入不同逻辑：
+
+- `/material/{code}` 或 `/material-info/material/{code}`：物料基础信息。
+- `/wuping/material/{code}`：库存台账。
+
+## 9. API 需求
+
+模块化 API 推荐格式：
+
+```text
+GET  /api/modules
+GET  /api/{module}/material/{material_code}
+GET  /api/{module}/materials?keyword=&limit=&offset=
+POST /api/{module}/materials/by-codes
+GET  /api/{module}/label-config
+GET  /api/{module}/sync/status
+POST /api/{module}/sync/run
+GET  /api/{module}/sync/config
+PUT  /api/{module}/sync/config
+```
+
+武平模块额外：
+
+```text
+GET /api/wuping/material/{material_code}/ledger?start_date=&end_date=
+```
+
+兼容旧项目 1：
+
+```text
+GET /api/material/{material_code}
+GET /api/materials
+```
+
+## 10. 数据需求
+
+建议按模块隔离本地数据：
+
+```text
+data/material-info/itemmark.db
+data/wuping/itemmark.db
+```
+
+首版每个模块的物料基础表仍可沿用 `material_label_items`，降低迁移风险。
+
+虽然物料基础信息在账套间通用，首版仍保留模块隔离的数据文件。这样可以减少整合时对旧项目 1 已稳定运行能力的影响，并方便未来按模块切换账套、同步范围或模板。
+
+新增系统管理表建议放在统一管理库：
+
+```text
+data/admin/itemmark_admin.db
+```
+
+管理表：
+
+- `module_configs`：模块配置。
+- `sync_configs`：同步计划配置。
+- `sync_runs`：同步执行记录。
+- `sync_locks`：同步锁或运行状态。
+
+## 11. 部署需求
+
+- Linux OS。
+- Docker Compose。
+- 统一域名：`https://code.zestrade.com`。
+- 可以复制旧项目真实 `.env`、数据库文件、证书私钥到 ItemMark 项目中作为部署资料。
+- 生产部署时需要保留证书路径和 Nginx 配置。
+- 项目 1 已在 Linux OS 正常运行，整合时应优先保持项目 1 对外访问和标签打印效果不被破坏。
+- `/admin` 首版不做应用登录，也暂不做 Nginx IP 白名单。
+
+## 13. 开发与实现约束
+
+### 13.1 开发原则
+
+实现阶段必须遵循 `2026-04-20-LLM-写代码规范.md`：
+
+- 开始编码前列出假设、成功标准和验证方式。
+- 如果需求存在多种理解，先提出问题，不默默选择。
+- 只实现本次确认范围，不做猜测式扩展。
+- 只修改完成目标所必需的文件。
+- 保持旧项目已稳定功能优先，尤其是项目 1 的标签模板和 `/material/{code}` 旧二维码兼容。
+
+### 13.2 相对路径
+
+所有程序运行路径必须使用相对路径，例如：
+
+```text
+./data/material-info/itemmark.db
+./data/wuping/itemmark.db
+./data/admin/itemmark_admin.db
+./config/templates/material-info/label_config.xlsx
+./config/templates/wuping/label_config.xlsx
+./certs/code.zestrade.com/
+./logs/
+```
+
+文档中出现的 `/Users/mac/Desktop/ItemMark` 只表示当前开发工作目录，不允许写入程序配置、Docker Compose 或运行时代码。
+
+### 13.3 端口
+
+应用服务端口不使用常用端口号。首版建议：
+
+| 用途 | 端口 |
+|---|---|
+| Web 容器监听端口 | `18089` |
+| 宿主机映射端口 | `18089` |
+
+避免使用：
+
+```text
+80, 443, 8000, 8080, 3000, 5000, 5432, 3306, 6379
+```
+
+说明：`https://code.zestrade.com` 对外仍使用标准 HTTPS 访问；这里的非常用端口指 ItemMark Web 应用自身监听和 Docker 映射端口。
+
+## 14. 验收标准
+
+1. `https://code.zestrade.com/material/{code}` 可以显示对外物料信息，兼容旧项目 1 二维码。
+2. `https://code.zestrade.com/wuping/material/{code}` 可以显示武平库存台账。
+3. 两个模块可以分别打印标签，二维码路径不同。
+4. 两个模块可以分别配置 U8 地址、账套、账号、密码。
+5. 两个模块可以分别配置标签模板。
+6. 后台页面可以查看同步记录、修改同步计划、手动触发同步。
+7. 首次运行可以重新同步数据。
+8. Docker Compose 可在 Linux OS 启动。

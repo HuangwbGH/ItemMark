@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ItemMark</title>
+  <style>
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f4f6f8; color: #1f2933; }
+    header { background: #174f86; color: #fff; padding: 18px 28px; }
+    h1 { margin: 0; font-size: 22px; }
+    main { padding: 24px 28px; max-width: 980px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .card { background: #fff; border: 1px solid #dde3ea; border-radius: 8px; padding: 16px; }
+    .card h2 { margin: 0 0 8px; font-size: 17px; }
+    .links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    a { color: #174f86; text-decoration: none; font-weight: 600; }
+    .btn { display: inline-block; border: 1px solid #cbd5df; border-radius: 6px; padding: 7px 10px; background: #f8fafc; }
+  </style>
+</head>
+<body>
+<header><h1>ItemMark 物品标签与扫码查询系统</h1></header>
+<main>
+  <div class="grid">
+    {% for module in modules %}
+    <section class="card">
+      <h2>{{ module.module_name }}</h2>
+      <div>模块：{{ module.module_key }}</div>
+      <div>账套：{{ module.u8_database }}</div>
+      <div class="links">
+        <a class="btn" href="{{ module.base_path }}/batch">批量打印</a>
+        <a class="btn" href="/admin/sync">同步管理</a>
+      </div>
+    </section>
+    {% endfor %}
+  </div>
+</main>
+</body>
+</html>
+

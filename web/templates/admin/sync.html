@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>同步管理 - ItemMark</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif; background: #f4f6f8; color: #1f2933; }
+    header { background: #174f86; color: #fff; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+    header a { color: #fff; text-decoration: none; }
+    main { padding: 18px 24px 40px; max-width: 1180px; }
+    .module { background: #fff; border: 1px solid #dce3ea; border-radius: 8px; margin-bottom: 16px; padding: 16px; }
+    .top { display: flex; justify-content: space-between; gap: 12px; align-items: center; border-bottom: 1px solid #edf1f5; padding-bottom: 12px; }
+    h2 { margin: 0; font-size: 17px; }
+    small { color: #64748b; font-weight: 500; }
+    button { border: 0; border-radius: 6px; padding: 8px 12px; font-weight: 700; cursor: pointer; background: #1769aa; color: #fff; }
+    button.secondary { background: #eef4fa; color: #174f86; border: 1px solid #c8d7e5; }
+    button.danger { background: #fff1f2; color: #b42318; border: 1px solid #fecdd3; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .settings { display: grid; gap: 12px; margin-top: 14px; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+    label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+    select { height: 34px; border: 1px solid #cbd5df; border-radius: 5px; padding: 0 8px; background: #fff; }
+    input[type="checkbox"], input[type="radio"] { width: 15px; height: 15px; accent-color: #1769aa; }
+    .time-options { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill { border: 1px solid #d7e0ea; border-radius: 999px; padding: 7px 10px; background: #f8fafc; }
+    .status { margin-top: 14px; display: grid; gap: 8px; }
+    .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+    .stat { background: #f8fafc; border: 1px solid #e5eaf0; border-radius: 6px; padding: 9px; }
+    .stat .k { color: #64748b; font-size: 12px; margin-bottom: 4px; }
+    .stat .v { font-weight: 700; word-break: break-all; }
+    .message { background: #f8fafc; border: 1px solid #e5eaf0; border-radius: 6px; padding: 10px; font-size: 13px; color: #334155; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+<header>
+  <strong>同步管理</strong>
+  <a href="/">返回首页</a>
+</header>
+<main>
+  {% for module in modules %}
+  <section
+    class="module"
+    data-module="{{ module.module_key }}"
+    data-sync-mode="{{ module.sync_mode }}"
+    data-sync-cron="{{ module.sync_cron }}"
+    data-interval-minutes="{{ module.interval_minutes }}"
+  >
+    <div class="top">
+      <h2>{{ module.module_name }} <small>{{ module.u8_database }} · {{ module.module_key }}</small></h2>
+      <div class="actions">
+        <button class="run-incremental">增量同步</button>
+        <button class="danger run-full">全量同步</button>
+      </div>
+    </div>
+
+    <div class="settings">
+      <div class="row">
+        <label class="pill"><input class="sync-enabled" type="checkbox" {% if module.sync_enabled %}checked{% endif %}> 启用自动同步</label>
+        <label><input class="schedule-kind" type="radio" name="kind-{{ module.module_key }}" value="cron"> 按固定时间</label>
+        <label><input class="schedule-kind" type="radio" name="kind-{{ module.module_key }}" value="interval"> 按固定频率</label>
+      </div>
+
+      <div class="row cron-settings">
+        <span>每天同步时间：</span>
+        <div class="time-options">
+          {% for hour in [0, 8, 10, 12, 14, 16, 18, 20, 22] %}
+          <label class="pill"><input class="run-hour" type="checkbox" value="{{ hour }}"> {{ "%02d:00"|format(hour) }}</label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="row interval-settings">
+        <span>同步频率：</span>
+        <select class="interval-minutes">
+          {% for minutes, label in [(15, "每 15 分钟"), (30, "每 30 分钟"), (60, "每 1 小时"), (120, "每 2 小时"), (240, "每 4 小时"), (720, "每 12 小时")] %}
+          <option value="{{ minutes }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="row">
+        <button class="secondary save-btn">保存自动同步设置</button>
+      </div>
+      <div class="message">说明：自动同步默认执行增量同步；首次没有历史成功记录时会自动做一次全量初始化。</div>
+    </div>
+
+    <div class="status">
+      <div class="status-grid"></div>
+      <div class="message">加载中...</div>
+    </div>
+  </section>
+  {% endfor %}
+</main>
+<script>
+  function parseCronHours(cron) {
+    const parts = (cron || "").trim().split(/\s+/);
+    if (parts.length !== 5 || parts[0] !== "0") return [8, 10, 14, 18];
+    return parts[1].split(",").map(v => Number(v)).filter(v => Number.isFinite(v));
+  }
+
+  function initControls(section) {
+    const mode = section.dataset.syncMode || "cron";
+    section.querySelectorAll(".schedule-kind").forEach(r => r.checked = r.value === mode);
+    const hours = new Set(parseCronHours(section.dataset.syncCron));
+    section.querySelectorAll(".run-hour").forEach(cb => cb.checked = hours.has(Number(cb.value)));
+    const interval = section.querySelector(".interval-minutes");
+    interval.value = section.dataset.intervalMinutes || "60";
+    toggleMode(section);
+  }
+
+  function toggleMode(section) {
+    const mode = section.querySelector(".schedule-kind:checked")?.value || "cron";
+    section.querySelector(".cron-settings").style.display = mode === "cron" ? "flex" : "none";
+    section.querySelector(".interval-settings").style.display = mode === "interval" ? "flex" : "none";
+  }
+
+  function renderStatus(section, data) {
+    const latest = data.latest_run || {};
+    const stats = [
+      ["状态", latest.status || "未同步"],
+      ["触发方式", latest.trigger_type || "-"],
+      ["开始时间", latest.started_at || "-"],
+      ["完成时间", latest.finished_at || "-"],
+      ["抽取", latest.extracted_count ?? 0],
+      ["新增", latest.inserted_count ?? 0],
+      ["更新", latest.updated_count ?? 0],
+      ["失败", latest.failed_count ?? 0]
+    ];
+    section.querySelector(".status-grid").innerHTML = stats.map(([k, v]) => `
+      <div class="stat"><div class="k">${k}</div><div class="v">${String(v)}</div></div>
+    `).join("");
+    section.querySelector(".message").textContent = latest.error_message || "无错误信息";
+  }
+
+  function loadStatus(section) {
+    const moduleKey = section.dataset.module;
+    fetch(`/api/${moduleKey}/sync/status`)
+      .then(r => r.json())
+      .then(res => renderStatus(section, res.data || {}))
+      .catch(err => section.querySelector(".message").textContent = String(err));
+  }
+
+  function runSync(section, syncScope) {
+    const moduleKey = section.dataset.module;
+    section.querySelector(".message").textContent = "同步任务已提交...";
+    fetch(`/api/${moduleKey}/sync/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sync_scope: syncScope })
+    }).then(() => setTimeout(() => loadStatus(section), 800));
+  }
+
+  function saveConfig(section) {
+    const moduleKey = section.dataset.module;
+    const mode = section.querySelector(".schedule-kind:checked")?.value || "cron";
+    const hours = [...section.querySelectorAll(".run-hour:checked")].map(cb => Number(cb.value));
+    if (mode === "cron" && hours.length === 0) {
+      alert("请至少选择一个固定同步时间");
+      return;
+    }
+    const syncCron = `0 ${hours.sort((a, b) => a - b).join(",")} * * *`;
+    const body = {
+      sync_enabled: section.querySelector(".sync-enabled").checked,
+      sync_mode: mode,
+      sync_cron: syncCron,
+      interval_minutes: Number(section.querySelector(".interval-minutes").value || 60)
+    };
+    fetch(`/api/${moduleKey}/sync/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(() => {
+      section.querySelector(".message").textContent = "同步设置已保存";
+      loadStatus(section);
+    });
+  }
+
+  document.querySelectorAll(".module").forEach(section => {
+    initControls(section);
+    loadStatus(section);
+    section.querySelectorAll(".schedule-kind").forEach(r => r.addEventListener("change", () => toggleMode(section)));
+    section.querySelector(".run-incremental").addEventListener("click", () => runSync(section, "incremental"));
+    section.querySelector(".run-full").addEventListener("click", () => runSync(section, "full"));
+    section.querySelector(".save-btn").addEventListener("click", () => saveConfig(section));
+  });
+</script>
+</body>
+</html>

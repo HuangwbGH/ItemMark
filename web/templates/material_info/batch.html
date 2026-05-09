@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>物料标签批量打印</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      background: #f0f2f5;
+      color: #222;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── 顶栏 ── */
+    .topbar {
+      background: #1a6fc4;
+      color: #fff;
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    }
+    .topbar .title { font-size: 16px; font-weight: 700; flex: 0 0 auto; }
+    .search-wrap {
+      flex: 1;
+      max-width: 480px;
+      position: relative;
+    }
+    .search-wrap input {
+      width: 100%;
+      height: 34px;
+      border: none;
+      border-radius: 6px;
+      padding: 0 36px 0 12px;
+      font-size: 14px;
+      outline: none;
+    }
+    .search-wrap .clear-btn {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: #999;
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      display: none;
+    }
+    .topbar .hint { font-size: 12px; opacity: .75; white-space: nowrap; }
+
+    /* ── 操作栏 ── */
+    .actionbar {
+      background: #fff;
+      border-bottom: 1px solid #e8e8e8;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      position: sticky;
+      top: 52px;
+      z-index: 99;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 6px 16px;
+      min-height: 32px;
+      border-radius: 5px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: opacity .15s;
+    }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary  { background: #1a6fc4; color: #fff; }
+    .btn-default  { background: #fff; color: #333; border-color: #d9d9d9; }
+    .btn-danger   { background: #fff; color: #d9363e; border-color: #d9363e; }
+    .btn-home     { background: #f8fafc; color: #1a6fc4; border-color: #b9d3ee; text-decoration: none; }
+    .selected-tip {
+      margin-left: auto;
+      font-size: 13px;
+      color: #666;
+    }
+    .selected-tip strong { color: #1a6fc4; }
+
+    /* ── 搜索结果提示 ── */
+    .result-tip {
+      padding: 8px 24px 0;
+      font-size: 12px;
+      color: #999;
+    }
+
+    /* ── 表格 ── */
+    .table-wrap {
+      padding: 12px 24px 80px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    table {
+      width: 100%;
+      min-width: 860px;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07);
+      font-size: 13px;
+    }
+    thead { background: #f7f8fa; }
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid #f0f0f0;
+      white-space: nowrap;
+    }
+    th { font-weight: 600; color: #555; font-size: 12px; }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f5f9ff; }
+    tbody tr.selected { background: #e8f2ff; }
+
+    td.col-check { width: 36px; text-align: center; }
+    th.col-check { width: 36px; text-align: center; }
+    td.col-name  { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+    td.col-remark{ max-width: 140px; overflow: hidden; text-overflow: ellipsis; color: #888; }
+
+    input[type="checkbox"] {
+      width: 15px; height: 15px; cursor: pointer; accent-color: #1a6fc4;
+    }
+
+    /* ── 空态 / 加载态 ── */
+    .empty-state {
+      text-align: center;
+      padding: 60px 0;
+      color: #bbb;
+      font-size: 14px;
+    }
+    .loading { color: #1a6fc4; }
+
+    /* ── 底部悬浮打印栏 ── */
+    .print-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #fff;
+      border-top: 1px solid #e8e8e8;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 -2px 12px rgba(0,0,0,.08);
+      z-index: 200;
+    }
+    .print-bar .print-count { font-size: 14px; color: #333; }
+    .print-bar .print-count strong { color: #1a6fc4; font-size: 18px; }
+    .btn-print-big {
+      margin-left: auto;
+      padding: 9px 28px;
+      font-size: 15px;
+      font-weight: 700;
+      background: #1a6fc4;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+    }
+    .btn-print-big:disabled { opacity: .35; cursor: not-allowed; }
+
+    @media (max-width: 760px) {
+      .topbar {
+        height: auto;
+        min-height: 52px;
+        padding: 10px 12px;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .topbar .title {
+        flex: 1 1 100%;
+        font-size: 15px;
+      }
+      .search-wrap {
+        flex: 1 1 100%;
+        max-width: none;
+      }
+      .topbar .hint {
+        flex: 1 1 100%;
+        white-space: normal;
+      }
+      .actionbar {
+        top: 104px;
+        padding: 8px 12px;
+        gap: 8px;
+      }
+      .btn {
+        flex: 1 1 calc(50% - 8px);
+        padding: 7px 10px;
+        text-align: center;
+        white-space: nowrap;
+      }
+      .selected-tip {
+        flex: 1 1 100%;
+        margin-left: 0;
+        text-align: right;
+      }
+      .result-tip {
+        padding: 8px 12px 0;
+      }
+      .table-wrap {
+        padding: 10px 12px 96px;
+      }
+      th, td {
+        padding: 9px 10px;
+      }
+      .print-bar {
+        padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+        flex-wrap: wrap;
+      }
+      .print-bar .print-count {
+        flex: 1 1 100%;
+      }
+      .btn-print-big {
+        width: 100%;
+        margin-left: 0;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .btn {
+        flex-basis: 100%;
+      }
+      .selected-tip {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 顶栏 -->
+<div class="topbar">
+  <div class="title">物料标签批量打印</div>
+  <div class="search-wrap">
+    <input id="search-input" type="text" placeholder="搜索：编号 / 名称 / 布卡号 / 规格 / 颜色 / 备注 …" autocomplete="off" />
+    <button class="clear-btn" id="clear-btn" title="清空搜索">✕</button>
+  </div>
+  <div class="hint" id="search-hint">输入关键词搜索</div>
+</div>
+
+<!-- 操作栏 -->
+<div class="actionbar">
+  <a class="btn btn-home" href="/">返回首页</a>
+  <button class="btn btn-default" id="btn-select-all">全选本页</button>
+  <button class="btn btn-default" id="btn-deselect-all">取消全选</button>
+  <button class="btn btn-danger"  id="btn-clear-selected">清空已选</button>
+  <div class="selected-tip">已选 <strong id="selected-count">0</strong> 条</div>
+</div>
+
+<!-- 搜索结果提示 -->
+<div class="result-tip" id="result-tip"></div>
+
+<!-- 表格 -->
+<div class="table-wrap">
+  <table id="result-table">
+    <thead>
+      <tr>
+        <th class="col-check"><input type="checkbox" id="check-all" title="全选/取消" /></th>
+        <th>物料编号</th>
+        <th>物料名称</th>
+        <th>布卡号</th>
+        <th>规格型号</th>
+        <th>颜色</th>
+        <th>备注</th>
+        <th>分类名称</th>
+      </tr>
+    </thead>
+    <tbody id="result-body">
+      <tr><td colspan="8" class="empty-state">请输入关键词搜索，或留空查看全部</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- 底部打印栏 -->
+<div class="print-bar">
+  <div class="print-count">已选 <strong id="print-count">0</strong> 条标签</div>
+  <button class="btn-print-big" id="btn-print" disabled>打印选中标签</button>
+</div>
+
+<script>
+  // ── 状态 ──────────────────────────────────────────
+  const BASE_PATH = "{{ public_base_path }}";
+  const API_BASE_PATH = "{{ api_base_path }}";
+  const selected = new Set();   // 已选编码集合
+  let   allRows  = [];          // 当前搜索结果
+  let   searchTimer = null;
+
+  // ── DOM 引用 ──────────────────────────────────────
+  const searchInput   = document.getElementById("search-input");
+  const clearBtn      = document.getElementById("clear-btn");
+  const searchHint    = document.getElementById("search-hint");
+  const resultTip     = document.getElementById("result-tip");
+  const resultBody    = document.getElementById("result-body");
+  const checkAll      = document.getElementById("check-all");
+  const selectedCount = document.getElementById("selected-count");
+  const printCount    = document.getElementById("print-count");
+  const btnPrint      = document.getElementById("btn-print");
+
+  // ── 搜索 ─────────────────────────────────────────
+  function doSearch(keyword) {
+    searchHint.textContent = "搜索中…";
+    resultBody.innerHTML = `<tr><td colspan="8" class="empty-state loading">加载中…</td></tr>`;
+
+    const url = `${API_BASE_PATH}/materials?limit=300&keyword=${encodeURIComponent(keyword)}`;
+    fetch(url)
+      .then(r => r.json())
+      .then(res => {
+        allRows = res.data || [];
+        renderTable(allRows);
+        searchHint.textContent = keyword ? `共 ${allRows.length} 条` : `共 ${allRows.length} 条（全部）`;
+        resultTip.textContent  = keyword
+          ? `关键词「${keyword}」匹配到 ${allRows.length} 条`
+          : `共 ${allRows.length} 条（显示前 300 条）`;
+      })
+      .catch(() => {
+        searchHint.textContent = "搜索失败";
+        resultBody.innerHTML = `<tr><td colspan="8" class="empty-state">搜索失败，请检查服务</td></tr>`;
+      });
+  }
+
+  searchInput.addEventListener("input", () => {
+    const kw = searchInput.value.trim();
+    clearBtn.style.display = kw ? "block" : "none";
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => doSearch(kw), 300);
+  });
+
+  clearBtn.addEventListener("click", () => {
+    searchInput.value = "";
+    clearBtn.style.display = "none";
+    doSearch("");
+  });
+
+  // ── 渲染表格 ─────────────────────────────────────
+  function esc(s) {
+    return (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  function renderTable(rows) {
+    if (!rows.length) {
+      resultBody.innerHTML = `<tr><td colspan="8" class="empty-state">未找到匹配的物料</td></tr>`;
+      updateCheckAll();
+      return;
+    }
+    resultBody.innerHTML = rows.map(r => {
+      const checked = selected.has(r.material_code) ? "checked" : "";
+      const rowCls  = selected.has(r.material_code) ? "selected" : "";
+      return `
+        <tr class="${rowCls}" data-code="${esc(r.material_code)}">
+          <td class="col-check">
+            <input type="checkbox" class="row-check" data-code="${esc(r.material_code)}" ${checked} />
+          </td>
+          <td>${esc(r.material_code)}</td>
+          <td class="col-name" title="${esc(r.material_name)}">${esc(r.material_name)}</td>
+          <td>${esc(r.cloth_card_no)}</td>
+          <td>${esc(r.specification)}</td>
+          <td>${esc(r.color_desc)}</td>
+          <td class="col-remark" title="${esc(r.remark)}">${esc(r.remark)}</td>
+          <td>${esc(r.inv_class_name)}</td>
+        </tr>`;
+    }).join("");
+
+    // 绑定行 checkbox 事件
+    resultBody.querySelectorAll(".row-check").forEach(cb => {
+      cb.addEventListener("change", e => {
+        const code = e.target.dataset.code;
+        const tr   = e.target.closest("tr");
+        if (e.target.checked) {
+          selected.add(code);
+          tr.classList.add("selected");
+        } else {
+          selected.delete(code);
+          tr.classList.remove("selected");
+        }
+        updateCounters();
+        updateCheckAll();
+      });
+    });
+
+    // 点击行也可触发选中
+    resultBody.querySelectorAll("tr[data-code]").forEach(tr => {
+      tr.addEventListener("click", e => {
+        if (e.target.type === "checkbox") return;
+        const cb = tr.querySelector(".row-check");
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event("change"));
+      });
+    });
+
+    updateCheckAll();
+  }
+
+  // ── 全选 checkbox（表头）────────────────────────
+  function updateCheckAll() {
+    const currentCodes = allRows.map(r => r.material_code);
+    const allChecked   = currentCodes.length > 0 && currentCodes.every(c => selected.has(c));
+    const someChecked  = currentCodes.some(c => selected.has(c));
+    checkAll.checked       = allChecked;
+    checkAll.indeterminate = !allChecked && someChecked;
+  }
+
+  checkAll.addEventListener("change", () => {
+    allRows.forEach(r => {
+      if (checkAll.checked) selected.add(r.material_code);
+      else selected.delete(r.material_code);
+    });
+    renderTable(allRows);
+    updateCounters();
+  });
+
+  // ── 操作栏按钮 ────────────────────────────────────
+  document.getElementById("btn-select-all").addEventListener("click", () => {
+    allRows.forEach(r => selected.add(r.material_code));
+    renderTable(allRows);
+    updateCounters();
+  });
+
+  document.getElementById("btn-deselect-all").addEventListener("click", () => {
+    allRows.forEach(r => selected.delete(r.material_code));
+    renderTable(allRows);
+    updateCounters();
+  });
+
+  document.getElementById("btn-clear-selected").addEventListener("click", () => {
+    selected.clear();
+    renderTable(allRows);
+    updateCounters();
+  });
+
+  // ── 计数器更新 ───────────────────────────────────
+  function updateCounters() {
+    const n = selected.size;
+    selectedCount.textContent = n;
+    printCount.textContent    = n;
+    btnPrint.disabled         = n === 0;
+  }
+
+  // ── 打印按钮 ─────────────────────────────────────
+  btnPrint.addEventListener("click", () => {
+    if (!selected.size) return;
+    const codes = [...selected].join(",");
+    window.open(`${BASE_PATH}/batch/print?codes=${encodeURIComponent(codes)}`, "_blank");
+  });
+
+  // ── 初始化：加载全量 ──────────────────────────────
+  doSearch("");
+</script>
+
+</body>
+</html>

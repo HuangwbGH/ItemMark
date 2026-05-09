@@ -1,0 +1,33 @@
+services:
+  sync:
+    build:
+      context: .
+      dockerfile: sync/Dockerfile
+    container_name: itemmark-sync
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./logs:/app/logs
+    network_mode: host
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    container_name: itemmark-web
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./certs:/app/certs
+      - ./logs:/app/logs
+    ports:
+      - "18089:18089"
+    depends_on:
+      - sync
+
