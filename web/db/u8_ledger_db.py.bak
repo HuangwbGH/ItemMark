@@ -36,14 +36,13 @@ _ALL_FLOW_CTE = """
         CAST(R.dVeriDate AS DATETIME),
         CASE WHEN R.dnverifytime IS NOT NULL THEN R.dnverifytime ELSE CAST(R.dVeriDate AS DATETIME) END,
         R.cCode,
-        ISNULL(S.cRdName, N'采购入库'),
+        N'采购入库单',
         CAST(ISNULL(RS.iQuantity, 0) AS DECIMAL(18,6)),
         CAST(0 AS DECIMAL(18,6)),
         CAST(ISNULL(RS.iQuantity, 0) AS DECIMAL(18,6)),
         CAST(RS.AutoID AS BIGINT)
     FROM rdrecord01 R
     INNER JOIN rdrecords01 RS ON R.ID = RS.ID
-    LEFT JOIN Rd_Style S ON R.cRdCode = S.cRdCode
     WHERE RS.cInvCode = @cInvCode
       AND R.dVeriDate < DATEADD(DAY, 1, @EndDate)
 
@@ -55,33 +54,13 @@ _ALL_FLOW_CTE = """
         CAST(R.dVeriDate AS DATETIME),
         CASE WHEN R.dnverifytime IS NOT NULL THEN R.dnverifytime ELSE CAST(R.dVeriDate AS DATETIME) END,
         R.cCode,
-        ISNULL(S.cRdName, N'产成品入库'),
-        CAST(ISNULL(RS.iQuantity, 0) AS DECIMAL(18,6)),
-        CAST(0 AS DECIMAL(18,6)),
-        CAST(ISNULL(RS.iQuantity, 0) AS DECIMAL(18,6)),
-        CAST(RS.AutoID AS BIGINT)
-    FROM rdrecord10 R
-    INNER JOIN rdrecords10 RS ON R.ID = RS.ID
-    LEFT JOIN Rd_Style S ON R.cRdCode = S.cRdCode
-    WHERE RS.cInvCode = @cInvCode
-      AND R.dVeriDate < DATEADD(DAY, 1, @EndDate)
-
-    UNION ALL
-
-    SELECT
-        R.cWhCode,
-        CASE WHEN R.dnmaketime IS NOT NULL THEN R.dnmaketime ELSE CAST(R.dDate AS DATETIME) END,
-        CAST(R.dVeriDate AS DATETIME),
-        CASE WHEN R.dnverifytime IS NOT NULL THEN R.dnverifytime ELSE CAST(R.dVeriDate AS DATETIME) END,
-        R.cCode,
-        ISNULL(S.cRdName, N'其他入库'),
+        N'调拨入库单',
         CAST(ISNULL(RS.iQuantity, 0) AS DECIMAL(18,6)),
         CAST(0 AS DECIMAL(18,6)),
         CAST(ISNULL(RS.iQuantity, 0) AS DECIMAL(18,6)),
         CAST(RS.AutoID AS BIGINT)
     FROM rdrecord08 R
     INNER JOIN rdrecords08 RS ON R.ID = RS.ID
-    LEFT JOIN Rd_Style S ON R.cRdCode = S.cRdCode
     WHERE RS.cInvCode = @cInvCode
       AND R.dVeriDate < DATEADD(DAY, 1, @EndDate)
 
@@ -93,14 +72,13 @@ _ALL_FLOW_CTE = """
         CAST(R.dVeriDate AS DATETIME),
         CASE WHEN R.dnverifytime IS NOT NULL THEN R.dnverifytime ELSE CAST(R.dVeriDate AS DATETIME) END,
         R.cCode,
-        ISNULL(S.cRdName, N'其他出库'),
+        N'调拨出库单',
         CAST(0 AS DECIMAL(18,6)),
         CAST(ISNULL(RS.iQuantity, 0) AS DECIMAL(18,6)),
         CAST(-ISNULL(RS.iQuantity, 0) AS DECIMAL(18,6)),
         CAST(RS.AutoID AS BIGINT)
     FROM rdrecord09 R
     INNER JOIN rdrecords09 RS ON R.ID = RS.ID
-    LEFT JOIN Rd_Style S ON R.cRdCode = S.cRdCode
     WHERE RS.cInvCode = @cInvCode
       AND R.dVeriDate < DATEADD(DAY, 1, @EndDate)
 
@@ -112,14 +90,13 @@ _ALL_FLOW_CTE = """
         CAST(R.dVeriDate AS DATETIME),
         CASE WHEN R.dnverifytime IS NOT NULL THEN R.dnverifytime ELSE CAST(R.dVeriDate AS DATETIME) END,
         R.cCode,
-        ISNULL(S.cRdName, N'材料出库'),
+        N'材料出库单',
         CAST(0 AS DECIMAL(18,6)),
         CAST(ISNULL(RS.iQuantity, 0) AS DECIMAL(18,6)),
         CAST(-ISNULL(RS.iQuantity, 0) AS DECIMAL(18,6)),
         CAST(RS.AutoID AS BIGINT)
     FROM rdrecord11 R
     INNER JOIN rdrecords11 RS ON R.ID = RS.ID
-    LEFT JOIN Rd_Style S ON R.cRdCode = S.cRdCode
     WHERE RS.cInvCode = @cInvCode
       AND R.dVeriDate < DATEADD(DAY, 1, @EndDate)
 
@@ -131,14 +108,13 @@ _ALL_FLOW_CTE = """
         CAST(R.dVeriDate AS DATETIME),
         CASE WHEN R.dnverifytime IS NOT NULL THEN R.dnverifytime ELSE CAST(R.dVeriDate AS DATETIME) END,
         R.cCode,
-        ISNULL(S.cRdName, N'销售出库'),
+        N'销售出库单',
         CAST(0 AS DECIMAL(18,6)),
         CAST(ISNULL(RS.iQuantity, 0) AS DECIMAL(18,6)),
         CAST(-ISNULL(RS.iQuantity, 0) AS DECIMAL(18,6)),
         CAST(RS.AutoID AS BIGINT)
     FROM rdrecord32 R
     INNER JOIN rdrecords32 RS ON R.ID = RS.ID
-    LEFT JOIN Rd_Style S ON R.cRdCode = S.cRdCode
     WHERE RS.cInvCode = @cInvCode
       AND R.dVeriDate < DATEADD(DAY, 1, @EndDate)
 )
@@ -184,7 +160,7 @@ PeriodFlow AS (
 FlowWithSeq AS (
     SELECT
         ROW_NUMBER() OVER (
-            ORDER BY document_date, verify_date, verify_sort_time, detail_id
+            ORDER BY document_date, verify_sort_time, verify_date, detail_id
         ) AS seq,
         warehouse_code,
         document_date,
