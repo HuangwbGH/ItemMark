@@ -1,4 +1,5 @@
 import os
+import re
 from typing import Any, Dict, List, Tuple
 
 import openpyxl
@@ -10,8 +11,10 @@ DEFAULTS: Dict[str, Any] = {
     "label_width_mm": 100,
     "label_min_height_mm": 58,
     "label_padding_mm": 4,
+    "name_font_family": "Microsoft YaHei, PingFang SC, Arial, sans-serif",
     "name_font_size_pt": 13,
     "name_max_lines": 2,
+    "field_font_family": "Microsoft YaHei, PingFang SC, Arial, sans-serif",
     "field_font_size_pt": 8.5,
     "field_label_width_px": 52,
     "qr_show": True,
@@ -20,6 +23,7 @@ DEFAULTS: Dict[str, Any] = {
     "label_gap_mm": 6,
     "labels_per_page": 4,
     "footer_show": True,
+    "footer_font_family": "Microsoft YaHei, PingFang SC, Arial, sans-serif",
     "footer_font_size_pt": 6,
     "footer_left_text": "{material_code}",
     "footer_right_text": "{print_time}",
@@ -44,8 +48,10 @@ PARAM_MAP = {
     "标签宽度": ("label_width_mm", float),
     "标签最小高度": ("label_min_height_mm", float),
     "内边距": ("label_padding_mm", float),
+    "名称字体": ("name_font_family", str),
     "名称字号": ("name_font_size_pt", float),
     "名称最多行数": ("name_max_lines", int),
+    "字段字体": ("field_font_family", str),
     "字段字号": ("field_font_size_pt", float),
     "标签列宽": ("field_label_width_px", int),
     "显示二维码": ("qr_show", None),
@@ -54,6 +60,7 @@ PARAM_MAP = {
     "标签间距": ("label_gap_mm", float),
     "每页标签数": ("labels_per_page", int),
     "显示底部信息": ("footer_show", None),
+    "底部字体": ("footer_font_family", str),
     "底部字号": ("footer_font_size_pt", float),
     "底部左侧内容": ("footer_left_text", str),
     "底部右侧内容": ("footer_right_text", str),
@@ -61,6 +68,7 @@ PARAM_MAP = {
 
 BOOL_TRUE = {"是", "yes", "true", "1", "y"}
 _cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+FONT_NAME_RE = re.compile(r"^[\w\u4e00-\u9fff -]+$")
 
 
 def _to_bool(value) -> bool:
@@ -76,6 +84,22 @@ def _defaults() -> Dict[str, Any]:
     cfg["fields"] = [dict(field) for field in DEFAULT_FIELDS]
     cfg["visible_fields"] = [field for field in cfg["fields"] if field["show"]]
     cfg["field_label_width"] = f"{cfg['field_label_width_px']}px"
+    return _normalize_config(cfg)
+
+
+def _css_font_family(value: Any) -> str:
+    parts = []
+    for part in str(value or "").split(","):
+        name = part.strip().strip("\"'")
+        if name and FONT_NAME_RE.match(name):
+            parts.append(name)
+    return ", ".join(parts) or DEFAULTS["field_font_family"]
+
+
+def _normalize_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    cfg["name_font_family"] = _css_font_family(cfg.get("name_font_family"))
+    cfg["field_font_family"] = _css_font_family(cfg.get("field_font_family"))
+    cfg["footer_font_family"] = _css_font_family(cfg.get("footer_font_family"))
     return cfg
 
 
@@ -120,7 +144,7 @@ def _read_excel(path: str) -> Dict[str, Any]:
     cfg["fields"] = sorted(fields, key=lambda field: field["order"])
     cfg["visible_fields"] = [field for field in cfg["fields"] if field["show"]]
     cfg["field_label_width"] = f"{cfg['field_label_width_px']}px"
-    return cfg
+    return _normalize_config(cfg)
 
 
 def get_label_config(module_cfg: ModuleConfig) -> Dict[str, Any]:

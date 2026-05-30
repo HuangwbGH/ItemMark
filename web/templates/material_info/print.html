@@ -9,10 +9,13 @@
       --label-w:        {{ cfg.label_width_mm }}mm;
       --label-min-h:    {{ cfg.label_min_height_mm }}mm;
       --label-pad:      {{ cfg.label_padding_mm }}mm;
+      --name-font:      {{ cfg.name_font_family }};
       --name-fs:        {{ cfg.name_font_size_pt }}pt;
+      --field-font:     {{ cfg.field_font_family }};
       --field-fs:       {{ cfg.field_font_size_pt }}pt;
       --field-kw:       {{ cfg.field_label_width }};
       --qr-size:        {{ cfg.qr_size_mm }}mm;
+      --footer-font:    {{ cfg.footer_font_family }};
       --footer-fs:      {{ cfg.footer_font_size_pt }}pt;
     }
 
@@ -58,6 +61,7 @@
     }
 
     .label-name {
+      font-family: var(--name-font);
       font-size: var(--name-fs);
       font-weight: 700;
       text-align: center;
@@ -86,6 +90,7 @@
     .info-row {
       display: flex;
       gap: 2mm;
+      font-family: var(--field-font);
       font-size: var(--field-fs);
       line-height: 1.45;
     }
@@ -124,8 +129,9 @@
     .label-footer {
       border-top: 1px solid #eee;
       padding-top: 1.5mm;
+      font-family: var(--footer-font);
       font-size: var(--footer-fs);
-      color: #aaa;
+      color: #111;
       display: flex;
       justify-content: space-between;
     }
