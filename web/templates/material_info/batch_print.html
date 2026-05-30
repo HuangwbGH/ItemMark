@@ -13,6 +13,7 @@
       --name-fs:     {{ cfg.name_font_size_pt }}pt;
       --field-font:  {{ cfg.field_font_family }};
       --field-fs:    {{ cfg.field_font_size_pt }}pt;
+      --remark-lines: {{ cfg.remark_max_lines }};
       --field-kw:    {{ cfg.field_label_width }};
       --qr-size:     {{ cfg.qr_size_mm }}mm;
       --footer-font: {{ cfg.footer_font_family }};
@@ -117,9 +118,18 @@
     }
     .lbl-row .v {
       flex: 1;
+      min-width: 0;
       color: #111;
       word-break: break-all;
     }
+    {% if cfg.remark_max_lines > 0 %}
+    .lbl-row.field-remark .v {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: var(--remark-lines);
+      overflow: hidden;
+    }
+    {% endif %}
 
     {% if cfg.qr_show %}
     .lbl-qr {
@@ -208,9 +218,9 @@
     <div class="lbl-body">
       <div class="lbl-info">
         {% for field in cfg.visible_fields %}
-        <div class="lbl-row">
+        <div class="lbl-row field-{{ field.key }}">
           <span class="k">{{ field.label }}</span>
-          <span class="v">{{ item[field.key] or '—' }}</span>
+          <span class="v"{% if field.key == 'remark' and cfg.remark_max_lines > 0 %} title="{{ item[field.key] or '—' }}"{% endif %}>{{ item[field.key] or '—' }}</span>
         </div>
         {% endfor %}
       </div>
