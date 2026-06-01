@@ -205,6 +205,13 @@
         gap: {{ cfg.label_gap_mm }}mm;
       }
 
+      {% if cfg.labels_per_page == 1 %}
+      .labels-grid {
+        display: block;
+        gap: 0;
+      }
+      {% endif %}
+
       .label-card {
         border: 1px solid #999;
         box-shadow: none;
@@ -214,9 +221,9 @@
       }
 
       {% if cfg.labels_per_page > 0 %}
-      .label-card:nth-child({{ cfg.labels_per_page }}n) {
+      .label-card:nth-child({{ cfg.labels_per_page }}n):not(:last-child) {
         page-break-after: always;
-        break-after: always;
+        break-after: page;
       }
       {% endif %}
     }
