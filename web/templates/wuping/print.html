@@ -13,6 +13,7 @@
       --name-fs:        {{ cfg.name_font_size_pt }}pt;
       --field-font:     {{ cfg.field_font_family }};
       --field-fs:       {{ cfg.field_font_size_pt }}pt;
+      --field-lines:    {{ cfg.field_value_max_lines }};
       --remark-lines:   {{ cfg.remark_max_lines }};
       --field-kw:       {{ cfg.field_label_width }};
       --qr-size:        {{ cfg.qr_size_mm }}mm;
@@ -50,7 +51,7 @@
     /* ── 标签卡片 ── */
     .label-card {
       width: var(--label-w);
-      min-height: var(--label-min-h);
+      height: var(--label-min-h);
       background: #fff;
       border: 1px solid #ccc;
       border-radius: 4px;
@@ -59,6 +60,7 @@
       flex-direction: column;
       gap: 2.5mm;
       box-shadow: 0 2px 8px rgba(0,0,0,.15);
+      overflow: hidden;
     }
 
     .label-name {
@@ -81,12 +83,17 @@
       gap: 2.5mm;
       align-items: flex-start;
       flex: 1;
+      min-height: 0;
+      overflow: hidden;
     }
     .label-info {
       flex: 1;
+      min-width: 0;
+      min-height: 0;
       display: flex;
       flex-direction: column;
       gap: 1.5mm;
+      overflow: hidden;
     }
     .info-row {
       display: flex;
@@ -106,6 +113,14 @@
       color: #111;
       word-break: break-all;
     }
+    {% if cfg.field_value_max_lines > 0 %}
+    .info-row .v {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: var(--field-lines);
+      overflow: hidden;
+    }
+    {% endif %}
     {% if cfg.remark_max_lines > 0 %}
     .info-row.field-remark .v {
       display: -webkit-box;
@@ -144,6 +159,13 @@
       color: #111;
       display: flex;
       justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .label-footer span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     {% endif %}
 
@@ -156,7 +178,7 @@
     @media print {
       html, body {
         width: var(--label-w);
-        min-height: var(--label-min-h);
+        height: var(--label-min-h);
       }
       body {
         background: #fff;
@@ -169,7 +191,7 @@
       .toolbar { display: none; }
       .label-card {
         width: var(--label-w);
-        min-height: var(--label-min-h);
+        height: var(--label-min-h);
         border: 1px solid #999;
         box-shadow: none;
         border-radius: 0;
@@ -194,7 +216,7 @@
       {% for field in cfg.visible_fields %}
       <div class="info-row field-{{ field.key }}">
         <span class="k">{{ field.label }}</span>
-        <span class="v"{% if field.key == 'remark' and cfg.remark_max_lines > 0 %} title="{{ item[field.key] or '—' }}"{% endif %}>{{ item[field.key] or '—' }}</span>
+        <span class="v"{% if cfg.field_value_max_lines > 0 or (field.key == 'remark' and cfg.remark_max_lines > 0) %} title="{{ item[field.key] or '—' }}"{% endif %}>{{ item[field.key] or '—' }}</span>
       </div>
       {% endfor %}
     </div>
