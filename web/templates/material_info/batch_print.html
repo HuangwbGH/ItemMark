@@ -181,6 +181,76 @@
     }
     {% endif %}
 
+    .split-card {
+      gap: 0;
+      padding: 0;
+    }
+    .split-items {
+      display: grid;
+      grid-template-rows: 1fr 1fr;
+      width: 100%;
+      height: 100%;
+    }
+    .split-item {
+      min-width: 0;
+      height: 100%;
+      padding: 2mm 3mm;
+      display: grid;
+      grid-template-columns: 1fr var(--qr-size);
+      gap: 1.5mm;
+      align-items: center;
+      overflow: hidden;
+    }
+    .split-item + .split-item {
+      border-top: 1px dashed #999;
+    }
+    .split-info {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: .8mm;
+      overflow: hidden;
+    }
+    .split-row {
+      font-family: var(--field-font);
+      color: #111;
+      line-height: 1.15;
+      word-break: break-all;
+    }
+    .split-row:not(.field-material_name) {
+      display: grid;
+      grid-template-columns: 12mm 1fr;
+      gap: 1mm;
+      align-items: baseline;
+    }
+    .split-row .k {
+      font-size: 5.5pt;
+      color: #555;
+      font-weight: 600;
+    }
+    .split-row .v {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+      overflow: hidden;
+      font-size: var(--field-fs);
+      font-weight: 600;
+    }
+    .split-row.field-material_name .v {
+      font-family: var(--name-font);
+      font-size: 10pt;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+    .split-qr img {
+      width: var(--qr-size);
+      height: var(--qr-size);
+      display: block;
+    }
+    .split-empty {
+      display: block;
+    }
+
     /* ── 打印样式 ── */
     @page {
       /* 去掉浏览器默认页边距，避免内容被裁剪 */
@@ -233,12 +303,41 @@
 
 <div class="toolbar">
   <h2>批量打印标签</h2>
-  <span class="sub">共 {{ items|length }} 条 · 每行 {{ cfg.labels_per_row }} 张{% if cfg.labels_per_page > 0 %} · 每页 {{ cfg.labels_per_page }} 张{% endif %}</span>
+  <span class="sub">共 {{ items|length }} 条 · {{ cfg.template_name }}{% if cfg.layout_type == 'split_2' %} · 每张纸 2 条{% else %} · 每行 {{ cfg.labels_per_row }} 张{% if cfg.labels_per_page > 0 %} · 每页 {{ cfg.labels_per_page }} 张{% endif %}{% endif %}</span>
   <button class="btn btn-back"  onclick="window.close()">关闭</button>
   <button class="btn btn-print" onclick="window.print()">打印全部</button>
 </div>
 
 <div class="labels-grid">
+  {% if cfg.layout_type == 'split_2' %}
+  {% for pair in items|batch(2, none) %}
+  <div class="label-card split-card">
+    <div class="split-items">
+      {% for split_item in pair %}
+      <div class="split-item{% if not split_item %} split-empty{% endif %}">
+        {% if split_item %}
+        <div class="split-info">
+          {% for field in cfg.visible_fields %}
+          <div class="split-row field-{{ field.key }}">
+            {% if field.key != 'material_name' %}
+            <span class="k">{{ field.label }}</span>
+            {% endif %}
+            <span class="v">{{ split_item[field.key] or '—' }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% if cfg.qr_show %}
+        <div class="split-qr">
+          <img src="{{ public_base_path }}/qr/{{ split_item.material_code }}" alt="QR" />
+        </div>
+        {% endif %}
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
   {% for item in items %}
   <div class="label-card">
 
@@ -271,6 +370,7 @@
 
   </div>
   {% endfor %}
+  {% endif %}
 </div>
 
 </body>

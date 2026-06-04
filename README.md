@@ -25,6 +25,7 @@ HOST_WEB_PORT=18089
   - [本地启动](#本地启动)
   - [常用入口](#常用入口)
   - [打印标签](#打印标签)
+  - [选择打印模板](#选择打印模板)
   - [手机扫码](#手机扫码)
   - [同步管理](#同步管理)
 - [配置说明](#配置说明)
@@ -184,8 +185,38 @@ http://127.0.0.1:18089/wuping/batch             武平批量打印
 1. 打开对应模块的批量打印页。
 2. 搜索物料编码、名称、布卡号、规格、颜色等关键词。
 3. 勾选需要打印的物料。
-4. 点击“打印选中标签”。
-5. 浏览器打开批量打印页后执行打印。
+4. 对外物料信息模块可选择打印模板。
+5. 点击“打印选中标签”。
+6. 浏览器打开批量打印页后执行打印。
+
+### 选择打印模板
+
+`material-info` 模块支持多个打印模板。模板文件放在：
+
+```text
+config/templates/material-info/
+```
+
+默认模板：
+
+```text
+config/templates/material-info/label_config.xlsx
+```
+
+新增模板使用同目录下的 `.xlsx` 文件，例如：
+
+```text
+config/templates/material-info/accessory_split_2.xlsx
+```
+
+当前内置模板：
+
+| 模板 | 文件 | 说明 |
+|---|---|---|
+| 标准模板 | `label_config.xlsx` | 保持原标签打印效果 |
+| 辅料双联模板 | `accessory_split_2.xlsx` | 在原打印纸大小内上下打印两个信息区，包含物料名称、物料编码、颜色、二维码 |
+
+批量打印时选择“辅料双联模板”后，每张纸上下排两个已选物料；如果已选数量为奇数，最后一个信息区留空。单张打印使用辅料双联模板时，同一物料上下打印两份信息区。
 
 ### 手机扫码
 
@@ -350,6 +381,8 @@ config/templates/wuping/label_config.xlsx
 
 标签模板控制：
 
+- 模板名称。
+- 布局类型：`standard` 或 `split_2`。
 - 标签宽度。
 - 标签最小高度。
 - 内边距。
@@ -398,6 +431,7 @@ config/templates/wuping/label_config.xlsx
 ```bash
 python3 tools/create_label_config.py --module material-info
 python3 tools/create_label_config.py --module wuping
+python3 tools/create_label_config.py --module material-info --template accessory-split-2
 ```
 
 注意：重置会覆盖对应模块模板。

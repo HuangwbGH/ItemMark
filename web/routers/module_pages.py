@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 
-from services.label_template_service import get_label_config
+from services.label_template_service import get_label_config, list_label_templates
 from services.ledger_service import default_start_date, fetch_ledger, format_quantity
 from services.material_service import by_codes, find_material
 from services.module_config_service import get_module_config
@@ -43,6 +43,13 @@ def _material_or_404(cfg, material_code: str):
     if not item:
         raise HTTPException(status_code=404, detail="物料不存在")
     return item
+
+
+def _label_config_or_404(cfg, template_key: Optional[str]):
+    try:
+        return get_label_config(cfg, template_key)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 def _footer_text(template: str, item) -> str:
@@ -123,11 +130,24 @@ def module_material_detail(
 
 
 @router.get("/{module_key}/print/{material_code}", response_class=HTMLResponse)
-def print_label(request: Request, module_key: str, material_code: str):
+def print_label(
+    request: Request,
+    module_key: str,
+    material_code: str,
+    template: Optional[str] = Query(default=None),
+):
     cfg = _cfg(module_key)
     item = _material_or_404(cfg, material_code)
+    label_cfg = _label_config_or_404(cfg, template if module_key == "material-info" else None)
     context = _context(request, cfg)
-    context.update({"item": item, "cfg": get_label_config(cfg)})
+    context.update(
+        {
+            "item": item,
+            "cfg": label_cfg,
+            "selected_template": label_cfg["template_key"],
+            "label_templates": list_label_templates(cfg) if module_key == "material-info" else [],
+        }
+    )
     context["footer_text"] = _footer_text
     return templates.TemplateResponse(f"{_template_prefix(module_key)}/print.html", context)
 
@@ -135,11 +155,18 @@ def print_label(request: Request, module_key: str, material_code: str):
 @router.get("/{module_key}/batch", response_class=HTMLResponse)
 def batch(request: Request, module_key: str):
     cfg = _cfg(module_key)
-    return templates.TemplateResponse(f"{_template_prefix(module_key)}/batch.html", _context(request, cfg))
+    context = _context(request, cfg)
+    context["label_templates"] = list_label_templates(cfg) if module_key == "material-info" else []
+    return templates.TemplateResponse(f"{_template_prefix(module_key)}/batch.html", context)
 
 
 @router.get("/{module_key}/batch/print", response_class=HTMLResponse)
-def batch_print(request: Request, module_key: str, codes: Optional[str] = Query(default="")):
+def batch_print(
+    request: Request,
+    module_key: str,
+    codes: Optional[str] = Query(default=""),
+    template: Optional[str] = Query(default=None),
+):
     cfg = _cfg(module_key)
     code_list = [code.strip() for code in (codes or "").split(",") if code.strip()]
     if not code_list:
@@ -147,8 +174,9 @@ def batch_print(request: Request, module_key: str, codes: Optional[str] = Query(
     items = by_codes(cfg, code_list)
     if not items:
         raise HTTPException(status_code=404, detail="未找到对应物料")
+    label_cfg = _label_config_or_404(cfg, template if module_key == "material-info" else None)
     context = _context(request, cfg)
-    context.update({"items": items, "cfg": get_label_config(cfg)})
+    context.update({"items": items, "cfg": label_cfg, "selected_template": label_cfg["template_key"]})
     context["footer_text"] = _footer_text
     return templates.TemplateResponse(f"{_template_prefix(module_key)}/batch_print.html", context)
 

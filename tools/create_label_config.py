@@ -82,6 +82,9 @@ def write_data_row(ws, row, values, alt=False):
 CONFIG_ROWS = [
     # (分组, 参数名称, 当前值, 默认值, 说明, 单位)
     # 分组行用 None 作为分隔
+    (None, "【模板信息】"),
+    ("模板信息", "模板名称", "标准模板", "标准模板", "打印页展示的模板名称", "-"),
+    ("模板信息", "布局类型", "standard", "standard", "standard = 标准标签；split_2 = 一张纸分成两个信息区", "-"),
     (None, "【标签尺寸】"),
     ("标签尺寸", "标签宽度",      100, 100, "标签纸宽度",                       "mm"),
     ("标签尺寸", "标签最小高度",   58,  58, "标签内容不足时的最小高度，内容超出时自动撑高", "mm"),
@@ -111,6 +114,23 @@ CONFIG_ROWS = [
     ("底部信息", "底部右侧内容", "{print_time}", "{print_time}", "支持占位符：{material_code}、{material_name}、{print_time} 等", "-"),
 ]
 
+ACCESSORY_SPLIT_CONFIG_OVERRIDES = {
+    "模板名称": "辅料双联模板",
+    "布局类型": "split_2",
+    "标签宽度": 100,
+    "标签最小高度": 87,
+    "内边距": 3,
+    "名称字号": 10,
+    "名称最多行数": 2,
+    "字段字号": 8,
+    "字段内容最多行数": 2,
+    "二维码尺寸": 20,
+    "每行标签数": 1,
+    "标签间距": 0,
+    "每页标签数": 1,
+    "显示底部信息": "否",
+}
+
 FIELD_ROWS = [
     # (字段键, 显示名称, 是否显示, 显示顺序)
     ("material_code",  "物料编号", "是", 1),
@@ -127,6 +147,7 @@ FIELD_ROWS = [
 ]
 
 MATERIAL_INFO_FIELD_ROWS = [
+    ("material_name",  "物料名称", "否", 0),
     ("material_code",  "物料编号", "是", 1),
     ("cloth_card_no",  "布卡号",   "是", 2),
     ("specification",  "规格型号", "是", 3),
@@ -140,8 +161,25 @@ MATERIAL_INFO_FIELD_ROWS = [
     ("package_size",   "包装尺寸", "否", 11),
 ]
 
+ACCESSORY_SPLIT_FIELD_ROWS = [
+    ("material_name", "物料名称", "是", 1),
+    ("material_code", "物料编码", "是", 2),
+    ("color_desc", "颜色", "是", 3),
+    ("cloth_card_no", "布卡号", "否", 4),
+    ("specification", "规格型号", "否", 5),
+    ("com_unit_name", "单位", "否", 6),
+    ("remark", "备注", "否", 7),
+    ("inv_class_name", "分类名称", "否", 8),
+    ("size_model", "尺码型号", "否", 9),
+    ("craft_desc", "工艺", "否", 10),
+    ("material_desc", "材质", "否", 11),
+    ("market_desc", "市场区域", "否", 12),
+    ("package_size", "包装尺寸", "否", 13),
+]
 
-def build_config_sheet(wb):
+
+def build_config_sheet(wb, overrides=None):
+    overrides = overrides or {}
     ws = wb.create_sheet("配置")
     ws.sheet_view.showGridLines = False
 
@@ -169,6 +207,7 @@ def build_config_sheet(wb):
             continue
 
         group, name, cur_val, def_val, desc, unit = entry
+        cur_val = overrides.get(name, cur_val)
         write_data_row(ws, row, [group, name, cur_val, def_val, desc, unit], alt=alt)
         # 「当前值」列加粗显示，提示用户这里可以修改
         ws.cell(row, 3).font = Font(name="微软雅黑", size=10, bold=True, color="1A6FC4")
@@ -226,21 +265,34 @@ def build_field_sheet(wb, field_rows):
 def main():
     parser = argparse.ArgumentParser(description="生成模块标签配置")
     parser.add_argument("--module", default="wuping", choices=["material-info", "wuping"])
+    parser.add_argument(
+        "--template",
+        default="default",
+        choices=["default", "accessory-split-2"],
+        help="default 生成 label_config.xlsx；accessory-split-2 生成 material-info 辅料双联模板",
+    )
     args = parser.parse_args()
+    if args.template == "accessory-split-2" and args.module != "material-info":
+        parser.error("辅料双联模板只支持 material-info 模块")
 
     out_dir = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "config", "templates", args.module,
     )
-    out_path = os.path.join(out_dir, "label_config.xlsx")
+    filename = "accessory_split_2.xlsx" if args.template == "accessory-split-2" else "label_config.xlsx"
+    out_path = os.path.join(out_dir, filename)
     os.makedirs(out_dir, exist_ok=True)
 
     wb = openpyxl.Workbook()
     # 删除默认 Sheet
     wb.remove(wb.active)
 
-    build_config_sheet(wb)
-    field_rows = MATERIAL_INFO_FIELD_ROWS if args.module == "material-info" else FIELD_ROWS
+    overrides = ACCESSORY_SPLIT_CONFIG_OVERRIDES if args.template == "accessory-split-2" else None
+    build_config_sheet(wb, overrides)
+    if args.template == "accessory-split-2":
+        field_rows = ACCESSORY_SPLIT_FIELD_ROWS
+    else:
+        field_rows = MATERIAL_INFO_FIELD_ROWS if args.module == "material-info" else FIELD_ROWS
     build_field_sheet(wb, field_rows)
 
     wb.save(out_path)

@@ -1,6 +1,7 @@
 import os
 import re
-from typing import Any, Dict, List, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import openpyxl
 
@@ -8,6 +9,9 @@ from services.module_config_service import ModuleConfig, resolve_module_path
 
 
 DEFAULTS: Dict[str, Any] = {
+    "template_key": "default",
+    "template_name": "标准模板",
+    "layout_type": "standard",
     "label_width_mm": 100,
     "label_min_height_mm": 58,
     "label_padding_mm": 4,
@@ -32,6 +36,7 @@ DEFAULTS: Dict[str, Any] = {
 }
 
 DEFAULT_FIELDS: List[Dict[str, Any]] = [
+    {"key": "material_name", "label": "物料名称", "show": False, "order": 0},
     {"key": "material_code", "label": "物料编号", "show": True, "order": 1},
     {"key": "cloth_card_no", "label": "布卡号", "show": True, "order": 2},
     {"key": "specification", "label": "规格型号", "show": True, "order": 3},
@@ -47,6 +52,8 @@ DEFAULT_FIELDS: List[Dict[str, Any]] = [
 ]
 
 PARAM_MAP = {
+    "模板名称": ("template_name", str),
+    "布局类型": ("layout_type", str),
     "标签宽度": ("label_width_mm", float),
     "标签最小高度": ("label_min_height_mm", float),
     "内边距": ("label_padding_mm", float),
@@ -73,6 +80,7 @@ PARAM_MAP = {
 BOOL_TRUE = {"是", "yes", "true", "1", "y"}
 _cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 FONT_NAME_RE = re.compile(r"^[\w\u4e00-\u9fff -]+$")
+TEMPLATE_KEY_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 
 def _to_bool(value) -> bool:
@@ -107,8 +115,9 @@ def _normalize_config(cfg: Dict[str, Any]) -> Dict[str, Any]:
     return cfg
 
 
-def _read_excel(path: str) -> Dict[str, Any]:
+def _read_excel(path: str, template_key: str = "default") -> Dict[str, Any]:
     cfg = DEFAULTS.copy()
+    cfg["template_key"] = template_key
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
 
     if "配置" in wb.sheetnames:
@@ -151,8 +160,28 @@ def _read_excel(path: str) -> Dict[str, Any]:
     return _normalize_config(cfg)
 
 
-def get_label_config(module_cfg: ModuleConfig) -> Dict[str, Any]:
-    path = resolve_module_path(module_cfg.template_path)
+def _template_path(module_cfg: ModuleConfig, template_key: Optional[str] = None) -> str:
+    base_path = Path(resolve_module_path(module_cfg.template_path))
+    key = (template_key or "default").strip()
+    if key in {"", "default"}:
+        return str(base_path)
+    if not TEMPLATE_KEY_RE.match(key):
+        raise KeyError(f"模板不存在：{template_key}")
+    path = base_path.parent / f"{key}.xlsx"
+    if not path.exists():
+        raise KeyError(f"模板不存在：{template_key}")
+    return str(path)
+
+
+def _template_key_from_path(module_cfg: ModuleConfig, path: str) -> str:
+    base_path = Path(resolve_module_path(module_cfg.template_path))
+    current = Path(path)
+    return "default" if current == base_path else current.stem
+
+
+def get_label_config(module_cfg: ModuleConfig, template_key: Optional[str] = None) -> Dict[str, Any]:
+    path = _template_path(module_cfg, template_key)
+    resolved_key = _template_key_from_path(module_cfg, path)
     try:
         mtime = os.path.getmtime(path)
     except FileNotFoundError:
@@ -163,8 +192,43 @@ def get_label_config(module_cfg: ModuleConfig) -> Dict[str, Any]:
         return cached[1]
 
     try:
-        data = _read_excel(path)
+        data = _read_excel(path, resolved_key)
     except Exception:
         data = _defaults()
+        data["template_key"] = resolved_key
     _cache[path] = (mtime, data)
     return data
+
+
+def list_label_templates(module_cfg: ModuleConfig) -> List[Dict[str, str]]:
+    base_path = Path(resolve_module_path(module_cfg.template_path))
+    candidates = []
+    if base_path.exists():
+        candidates.append(base_path)
+    candidates.extend(path for path in sorted(base_path.parent.glob("*.xlsx")) if path != base_path)
+
+    templates = []
+    seen = set()
+    for path in candidates:
+        key = _template_key_from_path(module_cfg, str(path))
+        if key in seen:
+            continue
+        seen.add(key)
+        cfg = get_label_config(module_cfg, key)
+        templates.append(
+            {
+                "key": key,
+                "name": str(cfg.get("template_name") or path.stem),
+                "layout_type": str(cfg.get("layout_type") or "standard"),
+            }
+        )
+    if not templates:
+        default = _defaults()
+        templates.append(
+            {
+                "key": "default",
+                "name": str(default["template_name"]),
+                "layout_type": str(default["layout_type"]),
+            }
+        )
+    return templates

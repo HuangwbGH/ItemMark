@@ -87,6 +87,15 @@
     .btn-default  { background: #fff; color: #333; border-color: #d9d9d9; }
     .btn-danger   { background: #fff; color: #d9363e; border-color: #d9363e; }
     .btn-home     { background: #f8fafc; color: #1a6fc4; border-color: #b9d3ee; text-decoration: none; }
+    .template-select {
+      min-height: 32px;
+      border: 1px solid #d9d9d9;
+      border-radius: 5px;
+      padding: 0 10px;
+      font-size: 13px;
+      background: #fff;
+      color: #222;
+    }
     .selected-tip {
       margin-left: auto;
       font-size: 13px;
@@ -206,6 +215,10 @@
         text-align: center;
         white-space: nowrap;
       }
+      .template-select {
+        flex: 1 1 100%;
+        width: 100%;
+      }
       .selected-tip {
         flex: 1 1 100%;
         margin-left: 0;
@@ -261,6 +274,11 @@
   <button class="btn btn-default" id="btn-select-all">全选本页</button>
   <button class="btn btn-default" id="btn-deselect-all">取消全选</button>
   <button class="btn btn-danger"  id="btn-clear-selected">清空已选</button>
+  <select class="template-select" id="template-select" title="打印模板">
+    {% for tpl in label_templates %}
+    <option value="{{ tpl.key }}">{{ tpl.name }}</option>
+    {% endfor %}
+  </select>
   <div class="selected-tip">已选 <strong id="selected-count">0</strong> 条</div>
 </div>
 
@@ -309,6 +327,7 @@
   const resultTip     = document.getElementById("result-tip");
   const resultBody    = document.getElementById("result-body");
   const checkAll      = document.getElementById("check-all");
+  const templateSelect = document.getElementById("template-select");
   const selectedCount = document.getElementById("selected-count");
   const printCount    = document.getElementById("print-count");
   const btnPrint      = document.getElementById("btn-print");
@@ -456,7 +475,8 @@
   btnPrint.addEventListener("click", () => {
     if (!selected.size) return;
     const codes = [...selected].join(",");
-    window.open(`${BASE_PATH}/batch/print?codes=${encodeURIComponent(codes)}`, "_blank");
+    const template = templateSelect ? templateSelect.value : "default";
+    window.open(`${BASE_PATH}/batch/print?codes=${encodeURIComponent(codes)}&template=${encodeURIComponent(template)}`, "_blank");
   });
 
   // ── 初始化：加载全量 ──────────────────────────────
