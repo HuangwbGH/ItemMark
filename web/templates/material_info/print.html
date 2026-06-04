@@ -13,7 +13,9 @@
       --name-fs:        {{ cfg.name_font_size_pt }}pt;
       --field-font:     {{ cfg.field_font_family }};
       --field-fs:       {{ cfg.field_font_size_pt }}pt;
+      --field-label-fs: {{ cfg.field_label_font_size_pt }}pt;
       --field-lines:    {{ cfg.field_value_max_lines }};
+      --color-lines:    {{ cfg.color_max_lines }};
       --remark-lines:   {{ cfg.remark_max_lines }};
       --field-kw:       {{ cfg.field_label_width }};
       --qr-size:        {{ cfg.qr_size_mm }}mm;
@@ -115,6 +117,7 @@
     .info-row .k {
       flex: 0 0 var(--field-kw);
       color: #555;
+      font-size: var(--field-label-fs);
       font-weight: 600;
     }
     .info-row .v {
@@ -217,12 +220,12 @@
     }
     .split-row:not(.field-material_name) {
       display: grid;
-      grid-template-columns: 12mm 1fr;
+      grid-template-columns: var(--field-kw) 1fr;
       gap: 1mm;
       align-items: baseline;
     }
     .split-row .k {
-      font-size: 5.5pt;
+      font-size: var(--field-label-fs);
       color: #555;
       font-weight: 600;
     }
@@ -233,6 +236,9 @@
       overflow: hidden;
       font-size: var(--field-fs);
       font-weight: 600;
+    }
+    .split-row.field-color_desc .v {
+      -webkit-line-clamp: var(--color-lines);
     }
     .split-row.field-material_name .v {
       font-family: var(--name-font);
